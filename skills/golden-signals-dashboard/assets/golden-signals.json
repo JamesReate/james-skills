@@ -19,7 +19,7 @@
   "id": null,
   "uid": "__APP__-golden-signals",
   "title": "__APP__ — Golden Signals",
-  "tags": ["atena", "golden-signals", "auto-provisioned"],
+  "tags": ["golden-signals", "auto-provisioned"],
   "schemaVersion": 39,
   "version": 1,
   "refresh": "1m",

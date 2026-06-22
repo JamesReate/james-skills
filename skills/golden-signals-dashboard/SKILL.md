@@ -4,39 +4,85 @@ description: >-
   Instrument an ASP.NET Core backend service with OpenTelemetry Prometheus
   metrics and provision a four-golden-signals Grafana dashboard (latency,
   traffic, errors, saturation per http.route) through the service's Helm
-  chart, matching the atena cluster's kube-prometheus-stack setup. Use when
+  chart, targeting a standard kube-prometheus-stack cluster. Use when
   adding observability/monitoring, a golden-signals dashboard, a ServiceMonitor,
-  or a /metrics endpoint to an atena backend repo.
+  or a /metrics endpoint to an ASP.NET Core backend repo.
 ---
 
 # Golden Signals Dashboard
 
 Add the four golden signals — **latency, traffic, errors, saturation** — to an
-atena backend service, and surface them in Grafana. This mirrors the proven
-OpenHealth-V2 setup: OpenTelemetry auto-instrumentation exposes Prometheus
-metrics on a dedicated port; a ServiceMonitor makes the cluster's
-kube-prometheus-stack scrape them; a ConfigMap ships a per-app Grafana
-dashboard.
+ASP.NET Core backend service, and surface them in Grafana. The pattern:
+OpenTelemetry auto-instrumentation exposes Prometheus metrics on a dedicated
+port; a ServiceMonitor makes the cluster's kube-prometheus-stack scrape them; a
+ConfigMap ships a per-app Grafana dashboard.
 
-The cluster side (Prometheus + Grafana + operator) is already installed by
-`infra-charts/prom-stack` in `atena.charts`. This skill only touches the
-**application repo** — its .NET project and its Helm chart.
+The cluster side (Prometheus + Grafana + operator) is assumed to already be
+installed via `kube-prometheus-stack` — a standard, widely-used Helm chart, so
+this skill is cluster-agnostic. It only touches the **application repo** — its
+.NET project and its Helm chart.
 
 ## When to use
 
 - A backend service should report golden signals / appear in Grafana.
 - Someone asks for a ServiceMonitor, a `/metrics` endpoint, or "monitoring" on
-  an atena .NET service.
+  an ASP.NET Core .NET service.
 
 ## Prerequisites (verify first)
 
 - The service is **ASP.NET Core** (Kestrel) and has a **Helm chart** in the repo
   (typically under `helm/<app>/`). If there's no chart, stop and say so — this
   skill provisions monitoring *through* the chart.
-- The cluster already runs `kube-prometheus-stack` (it does, on atena). The
+- The cluster already runs `kube-prometheus-stack`. With its default values, the
   operator watches ServiceMonitors in **all** namespaces, and Grafana
   auto-discovers dashboard ConfigMaps labeled `grafana_dashboard: "1"` in any
-  namespace — so no cluster-side change is needed.
+  namespace — so no cluster-side change is needed. If you're unsure the install
+  matches these defaults, run the optional introspection below.
+
+## (Optional) Verify the cluster's kube-prometheus-stack
+
+Skip this if you already know the cluster runs a default `kube-prometheus-stack`.
+Run it when you have `kubectl` access and want to confirm the install actually
+matches the four assumptions this skill depends on — different installs scope the
+operator by namespace or by label, which silently breaks auto-discovery. Replace
+`<ns>` with the monitoring namespace (often `monitoring` or `kube-prometheus-stack`).
+
+1. **Operator + CRDs present** — the prometheus-operator must be running and the
+   `ServiceMonitor` CRD installed, or the chart's ServiceMonitor is ignored:
+   ```bash
+   kubectl get crd servicemonitors.monitoring.coreos.com
+   kubectl get pods -A -l app.kubernetes.io/name=prometheus-operator
+   ```
+
+2. **ServiceMonitor selection scope** — confirm the Prometheus CR doesn't filter
+   ServiceMonitors by namespace or label. Empty/null selectors mean "match all"
+   (the default this skill expects):
+   ```bash
+   kubectl get prometheus -A \
+     -o custom-columns=NAME:.metadata.name,\
+SM_SELECTOR:.spec.serviceMonitorSelector,\
+SM_NS_SELECTOR:.spec.serviceMonitorNamespaceSelector
+   ```
+   If `serviceMonitorSelector` is set, the chart's ServiceMonitor labels must
+   match it. If `serviceMonitorNamespaceSelector` is set, the app's namespace
+   must satisfy it.
+
+3. **Grafana dashboard sidecar enabled** — the sidecar is what turns a labeled
+   ConfigMap into a live dashboard. Confirm it's running and learn which label it
+   watches (default `grafana_dashboard: "1"`, all namespaces):
+   ```bash
+   kubectl get pods -A -l app.kubernetes.io/name=grafana \
+     -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .spec.containers[*]}{.name}{" "}{end}{"\n"}{end}'
+   # look for a "grafana-sc-dashboard" sidecar container, then inspect its env:
+   kubectl -n <ns> set env deploy/<grafana-deploy> --list | grep -i 'LABEL\|NAMESPACE'
+   ```
+   `LABEL=grafana_dashboard`, `LABEL_VALUE=1`, and `NAMESPACE=ALL` are the
+   defaults the assets rely on. If the label differs, adjust the
+   `grafana_dashboard: "1"` label in `assets/grafana-dashboard.yaml`.
+
+If any check disagrees with the defaults, note the difference and adapt the
+assets (labels/namespace) before checking them in — otherwise the dashboard or
+scrape target silently won't appear.
 
 ## Placeholders
 
