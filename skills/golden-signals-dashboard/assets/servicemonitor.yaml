@@ -1,0 +1,25 @@
+{{- if .Values.serviceMonitor.enabled }}
+# ServiceMonitor — Prometheus discovery via the prometheus-operator CRD shipped
+# by kube-prometheus-stack. Scrapes the in-cluster Service on the dedicated
+# `metrics` port (9090) at /metrics. The public Service port / ingress only
+# routes 8080, and Kestrel scopes /metrics to 9090 via RequireHost — so
+# /metrics is unreachable from outside the cluster.
+#
+# Toggle off (serviceMonitor.enabled=false) in environments where
+# kube-prometheus-stack is not installed.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "__CHART__.fullname" . }}
+  labels:
+    {{- include "__CHART__.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "__CHART__.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ .Values.serviceMonitor.interval | default "60s" }}
+      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout | default "10s" }}
+{{- end }}

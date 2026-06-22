@@ -1,0 +1,11 @@
+<!-- OpenTelemetry — golden-signals observability. AspNetCore + Http
+     auto-instrumentation gives latency/traffic/errors per http.route;
+     Runtime instrumentation adds GC + ThreadPool counters. The Prometheus
+     exporter exposes /metrics for the in-cluster ServiceMonitor to scrape.
+     Add inside an <ItemGroup> in the web project's .csproj. Bump the versions
+     in lockstep if the repo already pins a newer OpenTelemetry line. -->
+<PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.11.2" />
+<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.11.1" />
+<PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.11.1" />
+<PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.11.1" />
+<PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.11.0-beta.2" />

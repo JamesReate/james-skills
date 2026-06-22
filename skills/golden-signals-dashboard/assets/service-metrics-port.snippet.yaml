@@ -1,0 +1,8 @@
+# Add this second port to the chart's templates/service.yaml, under
+# spec.ports (alongside the existing `http` port). Kestrel listens on 9090 in
+# addition to 8080 (see Program.cs); the ServiceMonitor targets this port by
+# name. No ingress/tunnel mapping — it's in-cluster only.
+- name: metrics
+  port: {{ .Values.service.metricsPort | default 9090 }}
+  targetPort: {{ .Values.service.metricsPort | default 9090 }}
+  protocol: TCP

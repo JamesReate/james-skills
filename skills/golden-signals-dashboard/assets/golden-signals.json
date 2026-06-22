@@ -1,0 +1,234 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "__APP__ — four golden signals (latency, traffic, errors, saturation) per http.route. Auto-provisioned by the app's Helm chart; select the namespace (dev/prod) and route at the top.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "uid": "__APP__-golden-signals",
+  "title": "__APP__ — Golden Signals",
+  "tags": ["atena", "golden-signals", "auto-provisioned"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "selected": false, "text": "Prometheus", "value": "Prometheus" },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "refresh": 1,
+        "regex": ""
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "definition": "label_values(http_server_request_duration_seconds_count{job=\"__JOB__\"}, namespace)",
+        "query": { "qryType": 1, "query": "label_values(http_server_request_duration_seconds_count{job=\"__JOB__\"}, namespace)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+        "current": { "selected": true, "text": "prod", "value": "prod" },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "refresh": 1,
+        "sort": 1,
+        "regex": ""
+      },
+      {
+        "name": "route",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "definition": "label_values(http_server_request_duration_seconds_count{job=\"__JOB__\", namespace=\"$namespace\"}, http_route)",
+        "query": { "qryType": 1, "query": "label_values(http_server_request_duration_seconds_count{job=\"__JOB__\", namespace=\"$namespace\"}, http_route)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "hide": 0,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 1,
+        "sort": 1,
+        "regex": ""
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Latency p50 (per route)",
+      "description": "Median request duration by http.route — the 'typical user' view. Legend sorted by max latency descending so the slowest routes surface at the top. Add an http_route!~ exclusion if a long-lived endpoint (e.g. websockets/SignalR) skews the histogram.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 6 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "min": 0, "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 5 } },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["mean", "max"], "sortBy": "Max", "sortDesc": true }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket{job=\"__JOB__\", namespace=\"$namespace\", http_route=~\"$route\"}[5m])) by (le, http_route))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Latency p99 (per route)",
+      "description": "99th-percentile request duration by http.route — the 'worst-case user' view, where slow tenants live. Legend sorted by max latency descending.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 6 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "min": 0, "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 5 } },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["mean", "max"], "sortBy": "Max", "sortDesc": true }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{job=\"__JOB__\", namespace=\"$namespace\", http_route=~\"$route\"}[5m])) by (le, http_route))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Traffic — requests/min (per route)",
+      "description": "Requests per minute per http.route, all methods + status codes aggregated. Prometheus samples the counter per-second; we multiply rate() by 60 for req/min. Unit `rotrpm` is Grafana's built-in 'revolutions per minute' — it renders as the bare suffix `rpm`, which is the intended display (a literal `req/min` custom unit prints the prefix in some Grafana versions).",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "rotrpm", "min": 0, "decimals": 1, "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "stacking": { "mode": "normal" } } },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["mean", "max"] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "60 * sum(rate(http_server_request_duration_seconds_count{job=\"__JOB__\", namespace=\"$namespace\", http_route=~\"$route\"}[5m])) by (http_route)",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Errors — 5xx count (per route, over time range)",
+      "description": "Total 5xx server errors per http.route over the selected dashboard time range. 4xx excluded — those are mostly client mistakes, not service health. Anything >0 warrants a look.",
+      "type": "bargauge",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum(round(increase(http_server_request_duration_seconds_count{job=\"__JOB__\", namespace=\"$namespace\", http_route=~\"$route\", http_response_status_code=~\"5..\"}[$__range]))) by (http_route)",
+          "legendFormat": "{{http_route}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Saturation — CPU % of limit (per pod)",
+      "description": "Per-pod CPU usage as a percentage of the configured container limit. Sustained >80% means we're approaching throttle territory.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0, "max": 1, "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 5 } },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["mean", "max"] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", pod=~\"__POD_PREFIX__.*\", container=\"__CONTAINER__\"}[5m])) by (pod) / on(pod) group_left() max(kube_pod_container_resource_limits{resource=\"cpu\", namespace=\"$namespace\", pod=~\"__POD_PREFIX__.*\", container=\"__CONTAINER__\"}) by (pod)",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Saturation — Memory % of limit (per pod)",
+      "description": "Per-pod working set as a percentage of the container memory limit. Sustained >85% precedes OOMKill.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0, "max": 1, "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 5 } },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["mean", "max"] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"__POD_PREFIX__.*\", container=\"__CONTAINER__\"}) by (pod) / on(pod) group_left() max(kube_pod_container_resource_limits{resource=\"memory\", namespace=\"$namespace\", pod=~\"__POD_PREFIX__.*\", container=\"__CONTAINER__\"}) by (pod)",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+// ── OpenTelemetry golden-signals instrumentation ──────────────────────────
+// Place the `using`s at the top of Program.cs and the two blocks below in the
+// builder/app sections respectively. Adapt names to the target service.
+
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+
+// --- builder section (services registration) ------------------------------
+
+// Expose a metrics-only Kestrel port (9090) alongside public traffic (8080).
+// The public ingress/Cloudflare tunnel only knows about 8080, so /metrics is
+// unreachable from the internet by construction — no auth or path filtering
+// needed. Skip in Development so local debugging keeps using launchSettings.
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(opts =>
+    {
+        opts.ListenAnyIP(8080); // public traffic (matches the Helm Service targetPort)
+        opts.ListenAnyIP(9090); // metrics-only; scraped by the ServiceMonitor
+    });
+}
+
+// serviceVersion: use whatever the app already exposes as its version (build
+// hash, assembly version, config value) so a dashboard can split by release.
+var serviceVersion = builder.Configuration["AppSettings:app-version"] ?? "unknown";
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService(serviceName: "__APP__", serviceVersion: serviceVersion))
+    .WithMetrics(m => m
+        .AddAspNetCoreInstrumentation()   // latency / traffic / errors per http.route
+        .AddHttpClientInstrumentation()   // outbound dependency calls
+        .AddRuntimeInstrumentation()      // GC + ThreadPool
+        .AddMeter("__APP__.*")            // reserved namespace for custom business Meters
+        .AddPrometheusExporter());
+
+// --- app section (after var app = builder.Build(); near the other endpoints) ---
+
+// Prometheus scrape endpoint at /metrics, scoped to port 9090 only via
+// RequireHost. Port 8080 (public) never serves /metrics; the in-cluster
+// ServiceMonitor scrapes the pod IP on 9090 directly.
+app.MapPrometheusScrapingEndpoint().RequireHost("*:9090");
