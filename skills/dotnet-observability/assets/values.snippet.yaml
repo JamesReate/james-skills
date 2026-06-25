@@ -13,9 +13,16 @@ serviceMonitor:
   interval: "60s"
   scrapeTimeout: "10s"
 
-# Grafana dashboard — provisioned via a ConfigMap labeled
+# Grafana dashboards — provisioned via a ConfigMap labeled
 # `grafana_dashboard: "1"`, auto-discovered and loaded by the cluster's
-# Grafana. The JSON lives in dashboards/ next to the chart so the dashboard
-# travels with the app it monitors.
+# Grafana. The JSON lives in dashboards/ next to the chart so the dashboards
+# travel with the app they monitor.
+#   - goldenSignals: the metrics dashboard (needs the OTel/Prometheus work).
+#   - logs:          the Loki logs dashboard (needs the Serilog JSON logging
+#                    work + a cluster Loki/Alloy stack). Off by default so a
+#                    metrics-only install doesn't ship a logs dashboard that
+#                    would read "No data".
 dashboards:
   enabled: true
+  goldenSignals: true
+  logs: false

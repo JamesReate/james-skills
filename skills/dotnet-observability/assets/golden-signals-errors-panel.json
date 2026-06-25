@@ -1,0 +1,12 @@
+{
+  "_comment": "OPTIONAL logs panel for the BOTTOM of golden-signals.json. Append this object to that dashboard's `panels` array (mind the comma). It puts a live error-log stream under the four metric signals so one dashboard shows 'is it slow/erroring' AND 'what's the error'. NOTE the datasource: golden-signals.json's `${datasource}` template var points at Prometheus, so this panel hardwires the Loki datasource by its fixed cluster uid `loki` (the uid set in prom-stack-values.yaml grafana.additionalDataSources). gridPos.y=28 places it below the existing saturation row (which ends at y=28); bump it if you've added rows. Requires the logging instrumentation (Serilog→stdout) to actually have data.",
+  "id": 20,
+  "title": "Recent errors (logs)",
+  "type": "logs",
+  "datasource": { "type": "loki", "uid": "loki" },
+  "gridPos": { "h": 10, "w": 24, "x": 0, "y": 28 },
+  "options": { "showTime": true, "showLabels": false, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": false, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending" },
+  "targets": [
+    { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "{app=\"__APP__\", namespace=\"$namespace\"} | detected_level=\"error\"", "queryType": "range" }
+  ]
+}

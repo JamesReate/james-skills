@@ -19,15 +19,15 @@ git clone https://github.com/jreate/james-skills.git ~/src/james-skills
 
 mkdir -p ~/.claude/skills
 # symlink each skill so `git pull` keeps them current
-ln -s ~/src/james-skills/skills/golden-signals-dashboard ~/.claude/skills/golden-signals-dashboard
+ln -s ~/src/james-skills/skills/dotnet-observability ~/.claude/skills/dotnet-observability
 ```
 
 ### Option B — install into a single repo (shared with your team)
 
 ```bash
 mkdir -p .claude/skills
-cp -R /path/to/james-skills/skills/golden-signals-dashboard .claude/skills/
-git add .claude/skills && git commit -m "Add golden-signals-dashboard skill"
+cp -R /path/to/james-skills/skills/dotnet-observability .claude/skills/
+git add .claude/skills && git commit -m "Add dotnet-observability skill"
 ```
 
 Committing under `.claude/skills/` means anyone who clones the repo — or any
@@ -44,36 +44,47 @@ needed.
 
 ## Skills
 
-### golden-signals-dashboard
+### dotnet-observability
 
-Instruments an **ASP.NET Core** backend with OpenTelemetry Prometheus metrics
-and provisions a **four-golden-signals** Grafana dashboard — **latency,
-traffic, errors, saturation** (per `http.route`) — entirely through the
-service's **Helm chart**.
+Wires a **.NET** service (ASP.NET Core **or** a worker/console host) into the
+Grafana observability stack — **metrics and/or logs** — entirely through the
+service's **Helm chart**. Two independent, opt-in halves:
 
-It touches only the **application repo** (the `.csproj`, `Program.cs`, and
-`helm/<app>/`). The cluster side (Prometheus, Grafana, the operator) is assumed
-to already exist. On deploy:
+- **Metrics (golden signals).** OpenTelemetry Prometheus metrics on a dedicated
+  metrics-only port (9090), a `ServiceMonitor` for `kube-prometheus-stack`, and
+  a per-app **four-golden-signals** dashboard — **latency, traffic, errors,
+  saturation** per `http.route`.
+- **Logs (Loki).** Serilog emits one single-line JSON object per event to
+  stdout; the cluster's Alloy DaemonSet tails it into Loki; a per-app **logs
+  dashboard** shows volume-by-level, error/warning counts, and live error +
+  all-log streams. Optionally an errors-log panel is appended to the
+  golden-signals dashboard.
 
-- OpenTelemetry auto-instrumentation exposes Prometheus metrics on a dedicated
-  metrics-only port (9090), kept off the public ingress.
-- A `ServiceMonitor` makes the cluster's `kube-prometheus-stack` scrape it.
-- A dashboard `ConfigMap` ships a per-app Grafana dashboard that travels with
-  the app.
+It also provisions, **once per cluster**, the Grafana **observability hub** home
+page — a landing page whose `dashlist` panels auto-populate by tag, so every
+instrumented app appears with no edits.
 
-**Use it when** a backend service should report golden signals / appear in
-Grafana, or someone asks for a `ServiceMonitor`, a `/metrics` endpoint, or
-"monitoring" on a .NET service.
+It touches only the **application repo** (the `.csproj`, `Program.cs`/worker,
+and `helm/<app>/`), plus the one-time hub in the infra/promstack repo. The
+cluster side (`kube-prometheus-stack` for metrics, Loki + Alloy for logs) is
+assumed to already exist. The skill **asks first** which pieces to apply — "the
+works" or any subset (metrics-only and logs-only are both fine).
+
+**Use it when** a .NET service should report golden signals or appear in
+Grafana/Loki, or someone asks for a `ServiceMonitor`, a `/metrics` endpoint,
+structured JSON logging, or a logs dashboard on a .NET service.
 
 #### What it adds
 
 | Layer | File(s) |
 |---|---|
-| .NET instrumentation | OpenTelemetry package refs in `.csproj`; OTel + Prometheus exporter wired in `Program.cs`, with Kestrel listening on `8080` (public) and `9090` (metrics-only) |
+| .NET — metrics | OpenTelemetry package refs in `.csproj`; OTel + Prometheus exporter in `Program.cs`, Kestrel on `8080` (public) + `9090` (metrics-only) |
+| .NET — logs | Serilog package refs; `UseSerilog`/`AddSerilog` with a JSON `ExpressionTemplate` to stdout (ASP.NET or worker) |
 | Helm — Service | second named port `metrics` (9090) |
 | Helm — discovery | `templates/servicemonitor.yaml` (prometheus-operator CRD) |
-| Helm — dashboard | `templates/grafana-dashboard.yaml` (ConfigMap) + `dashboards/golden-signals.json` |
-| Helm — toggles | `serviceMonitor.enabled`, `dashboards.enabled`, `service.metricsPort` in `values.yaml` |
+| Helm — dashboards | `templates/grafana-dashboard.yaml` (ConfigMap) + `dashboards/golden-signals.json` and/or `dashboards/logs.json` |
+| Helm — toggles | `serviceMonitor.enabled`, `dashboards.{enabled,goldenSignals,logs}`, `service.metricsPort` in `values.yaml` |
+| Cluster — hub | `observability-home.yaml` (org-home dashlist) + `grafana.ini: default_home_dashboard_path` — once per cluster |
 
 #### Cluster expectations (for automatic CI/CD pickup)
 
@@ -102,19 +113,26 @@ cluster meets these expectations:
    templates, so they ship on the next sync — committing the chart change is the
    only action required.
 
+For logs, the same applies via Loki + Alloy: Grafana needs a **Loki datasource**
+named `Loki` with uid `loki` (the assets reference that uid), and Alloy derives
+the `app` Loki label from each pod's `app.kubernetes.io/name`.
+
 Environments **without** prometheus-operator can opt out by setting
 `serviceMonitor.enabled=false` and `dashboards.enabled=false` in that
 environment's values.
 
-#### The dashboard
+#### The dashboards
 
-Latency p50 + p99 per route, traffic (req/min) per route, 5xx errors per route,
-and CPU/memory saturation as a % of each pod's limit. Namespace is a Grafana
-template variable, so one dashboard serves both `dev` and `prod`.
+**Golden signals:** latency p50 + p99 per route, traffic (req/min) per route,
+5xx errors per route, CPU/memory saturation as a % of each pod's limit — plus an
+optional error-log stream at the bottom. **Logs:** total/error/warning counts,
+log-volume-by-level (stacked bars), a "Recent errors" stream, and an "All logs"
+stream with a `$search` regex box. Namespace is a Grafana template variable, so
+one dashboard serves both `dev` and `prod`.
 
-See [`skills/golden-signals-dashboard/SKILL.md`](skills/golden-signals-dashboard/SKILL.md)
-for the full step-by-step, placeholder resolution table, and verification
-checklist.
+See [`skills/dotnet-observability/SKILL.md`](skills/dotnet-observability/SKILL.md)
+for the full step-by-step, the "ask what to instrument" menu, the placeholder
+resolution table, and the verification checklist.
 
 ---
 

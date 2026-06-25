@@ -1,0 +1,15 @@
+<!-- Serilog — structured JSON logging to stdout for Loki. Serilog.AspNetCore
+     pulls in the hosting integration + Console sink; Serilog.Expressions
+     provides the ExpressionTemplate that renders one JSON object per line.
+     Add inside an <ItemGroup> in the WEB project's .csproj. Bump versions to
+     whatever the repo already pins if it's on a newer Serilog line. -->
+<PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+<PackageReference Include="Serilog.Expressions" Version="5.0.0" />
+
+<!-- WORKER / console host variant (Host.CreateApplicationBuilder, no ASP.NET):
+     use these instead of Serilog.AspNetCore — same Console sink + template,
+     without the web dependency.
+<PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
+<PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+<PackageReference Include="Serilog.Expressions" Version="5.0.0" />
+-->

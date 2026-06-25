@@ -1,0 +1,75 @@
+# Observability hub — the Grafana org home page. ONE per cluster, NOT per app.
+# Lives in the infra / promstack repo (alongside prom-stack-values.yaml), not in
+# an app chart. It's a navigation page: the `dashlist` panels auto-populate by
+# tag, so every app that ships a dashboard tagged `logs` / `golden-signals`
+# (which the per-app dashboards in this skill already do) shows up here with NO
+# edits to this file. Apply it once, then make it the org home (see SKILL.md):
+#
+#   grafana.ini:
+#     dashboards:
+#       default_home_dashboard_path: /tmp/dashboards/materia-observability-home.json
+#
+# in prom-stack-values.yaml — the sidecar writes this ConfigMap's data key as the
+# filename under /tmp/dashboards/, so the path must match the key below exactly.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-observability-home-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  materia-observability-home.json: |-
+    {
+      "annotations": { "list": [ { "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard" } ] },
+      "description": "Landing page — jump to per-service Logs and Golden Signals dashboards. Lists auto-populate by tag.",
+      "editable": true,
+      "graphTooltip": 0,
+      "id": null,
+      "uid": "materia-observability-home",
+      "title": "Materia — Observability Home",
+      "tags": ["home", "auto-provisioned"],
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "",
+      "time": { "from": "now-6h", "to": "now" },
+      "templating": { "list": [] },
+      "panels": [
+        {
+          "id": 1,
+          "type": "text",
+          "title": "",
+          "transparent": true,
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+          "options": { "mode": "markdown", "content": "## Materia — Observability\nPer-service **Logs** and **Golden Signals** dashboards. The lists below populate automatically by tag — new services appear here with no edits.\n\n➡️ Ad-hoc log search: **Explore → Loki**.  Metrics: **Explore → Prometheus**." }
+        },
+        {
+          "id": 2,
+          "type": "dashlist",
+          "title": "📋 Logs (by service)",
+          "gridPos": { "h": 13, "w": 12, "x": 0, "y": 3 },
+          "options": { "showStarred": false, "showRecentlyViewed": false, "showSearch": true, "showHeadings": false, "maxItems": 50, "query": "", "tags": ["logs"], "includeVars": false, "keepTime": false }
+        },
+        {
+          "id": 3,
+          "type": "dashlist",
+          "title": "📊 Golden Signals (by service)",
+          "gridPos": { "h": 13, "w": 12, "x": 12, "y": 3 },
+          "options": { "showStarred": false, "showRecentlyViewed": false, "showSearch": true, "showHeadings": false, "maxItems": 50, "query": "", "tags": ["golden-signals"], "includeVars": false, "keepTime": false }
+        },
+        {
+          "id": 4,
+          "type": "dashlist",
+          "title": "⭐ Your starred",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "options": { "showStarred": true, "showRecentlyViewed": false, "showSearch": false, "showHeadings": false, "maxItems": 30, "query": "", "tags": [], "includeVars": false, "keepTime": false }
+        },
+        {
+          "id": 5,
+          "type": "dashlist",
+          "title": "🕐 Recently viewed",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "options": { "showStarred": false, "showRecentlyViewed": true, "showSearch": false, "showHeadings": false, "maxItems": 30, "query": "", "tags": [], "includeVars": false, "keepTime": false }
+        }
+      ]
+    }

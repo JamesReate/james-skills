@@ -1,0 +1,121 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "__APP__ — log overview (volume by level, error/warning counts, live error + all-log streams) from Loki.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "uid": "__APP__-logs",
+  "title": "__APP__ — Logs",
+  "tags": ["__APP__", "logs", "auto-provisioned"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-3h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "loki",
+        "current": { "selected": false, "text": "Loki", "value": "loki" },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "refresh": 1,
+        "regex": ""
+      },
+      {
+        "name": "search",
+        "type": "textbox",
+        "label": "Filter (regex, case-insensitive)",
+        "query": "",
+        "current": { "selected": false, "text": "", "value": "" },
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Total log lines",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "none", "graphMode": "area", "textMode": "auto", "justifyMode": "auto" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "${datasource}" }, "expr": "sum(count_over_time({app=\"__APP__\"} [$__range]))", "queryType": "instant" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Errors",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "area", "textMode": "auto", "justifyMode": "auto" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "${datasource}" }, "expr": "sum(count_over_time({app=\"__APP__\"} | detected_level=\"error\" [$__range]))", "queryType": "instant" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Warnings",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "orange" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "area", "textMode": "auto", "justifyMode": "auto" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "${datasource}" }, "expr": "sum(count_over_time({app=\"__APP__\"} | detected_level=\"warn\" [$__range]))", "queryType": "instant" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Log volume by level",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 70, "stacking": { "mode": "normal", "group": "A" }, "lineWidth": 1 }, "color": { "mode": "palette-classic" } }, "overrides": [ { "matcher": { "id": "byName", "options": "error" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] }, { "matcher": { "id": "byName", "options": "warn" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } } ] } ] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "${datasource}" }, "expr": "sum by (detected_level) (count_over_time({app=\"__APP__\"} [$__auto]))", "queryType": "range", "legendFormat": "{{detected_level}}" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Recent errors",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 12 },
+      "options": { "showTime": true, "showLabels": false, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": false, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "${datasource}" }, "expr": "{app=\"__APP__\"} | detected_level=\"error\"", "queryType": "range" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "All logs (filter with the $search variable)",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 22 },
+      "options": { "showTime": true, "showLabels": false, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": false, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "${datasource}" }, "expr": "{app=\"__APP__\"} |~ \"(?i)${search}\"", "queryType": "range" }
+      ]
+    }
+  ]
+}

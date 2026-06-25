@@ -1,0 +1,32 @@
+// ── Serilog JSON logging to stdout (Loki) — ASP.NET Core host ──────────────
+// Goal: one single-line JSON object per log event on stdout, with a `level`
+// field. Alloy tails the container's stdout and ships it to Loki; the `app`
+// Loki label comes from the pod's app.kubernetes.io/name label (NOT the log
+// body), and level filtering uses Loki's `detected_level` (which normalizes
+// Serilog's "Information"/"Warning"/"Error" casing), so the only hard
+// requirement is "valid single-line JSON with @l rendered".
+
+using Serilog;
+using Serilog.Templates;
+
+// --- builder section (replaces the default logging provider) ----------------
+
+// The ExpressionTemplate emits a JSON object: @t timestamp, @l level (renders
+// "Information"/"Warning"/"Error" → Loki detected_level), @m message, @x the
+// exception folded onto ONE line (a raw Console.WriteLine stack trace would
+// become N separate Loki lines — Serilog avoids that), and `..@p` spreads every
+// structured property as a top-level key. So LogInformation("done for {TenantId}", id)
+// yields a queryable `TenantId` field, filtered at query time with `| json`.
+builder.Host.UseSerilog((context, services, config) => config
+    .ReadFrom.Configuration(context.Configuration)   // honor appsettings MinimumLevel/Override
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(new ExpressionTemplate(
+        "{ {timestamp: @t, level: @l, message: @m, exception: @x, ..@p} }\n")));
+
+// --- app section (after var app = builder.Build();) -------------------------
+
+// One structured JSON line per HTTP request (method, path, status, elapsed)
+// instead of ASP.NET's default multi-line request logging. Optional but keeps
+// request logs queryable in Loki like everything else.
+app.UseSerilogRequestLogging();

@@ -1,0 +1,22 @@
+// ── Serilog JSON logging to stdout (Loki) — worker / console host ──────────
+// For services built with Host.CreateApplicationBuilder(args) (e.g. a
+// BackgroundService worker like SearchSync) rather than ASP.NET's
+// WebApplication.CreateBuilder. Same JSON-per-line template; registered via
+// AddSerilog on the service collection instead of UseSerilog on the host.
+// Use the WORKER package set from serilog.csproj.snippet.xml (no Serilog.AspNetCore).
+
+using Serilog;
+using Serilog.Templates;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.Services.AddSerilog((services, config) => config
+    .ReadFrom.Configuration(builder.Configuration)   // honor appsettings MinimumLevel/Override
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(new ExpressionTemplate(
+        "{ {timestamp: @t, level: @l, message: @m, exception: @x, ..@p} }\n")));
+
+// ... builder.Services.AddHostedService<Worker>(); etc.
+// var host = builder.Build();
+// host.Run();
